@@ -1,3 +1,4 @@
+import sys
 from src.manager import Manager
 from src.models import Parameters
 
@@ -33,7 +34,6 @@ def display_apartments(manager):
         for room in apartment.rooms.values():
             print(f"      • {room.name:<25} {room.area_m2:>6} m²")
         
-        # Find bills for this apartment
         apartment_bills = [bill for bill in manager.bills if bill.apartment == apartment.key]
         if apartment_bills:
             print_subsection_header("Bills")
@@ -54,7 +54,6 @@ def display_tenants(manager):
         print(f"   Deposit: {format_currency(tenant.deposit_pln)}")
         print(f"   Agreement: {tenant.date_agreement_from} to {tenant.date_agreement_to}")
         
-        # Find transfers for this tenant
         tenant_transfers = [transfer for transfer in manager.transfers if transfer.tenant == tenant.name]
         if tenant_transfers:
             print_subsection_header("Transfers")
@@ -63,11 +62,59 @@ def display_tenants(manager):
                 print(f"      • {format_currency(transfer.amount_pln):>15}  Date: {transfer.date}  Period: {month_year}")
 
 
-if __name__ == '__main__':
+
+def main():
+   
+    if len(sys.argv) != 4:
+        print_section_header("BŁĄD: NIEPOPRAWNA LICZBA ARGUMENTÓW")
+        print("Aby wyświetlić rozliczenie, użyj komendy w formacie:")
+        print(" > python main.py <apartment_key> <year> <month>\n")
+        print("Przykład:")
+        print(" > python main.py apart-polanka 2025 1\n")
+        
+       
+        print("Poniżej znajduje się domyślny zrzut wszystkich danych systemu:")
+        parameters = Parameters()
+        manager = Manager(parameters)
+        display_apartments(manager)
+        display_tenants(manager)
+        sys.exit(1)
+
+
+    apartment_key = sys.argv[1]
+    
+    try:
+        year = int(sys.argv[2])
+        month = int(sys.argv[3])
+    except ValueError:
+        print("\nBŁĄD: Argumenty <year> i <month> muszą być liczbami (np. 2025 1)!\n")
+        sys.exit(1)
+
+  
     parameters = Parameters()
     manager = Manager(parameters)
 
-    display_apartments(manager)
-    display_tenants(manager)
+    print_section_header(f"ROZLICZENIE: {apartment_key} | Okres: {month:02d}/{year}")
     
-    print(f"\n{'=' * 70}\n")
+    apartment_settlement = manager.get_settlement(apartment_key, year, month)
+    
+    if not apartment_settlement:
+        print(f"\n[!] Nie znaleziono mieszkania '{apartment_key}' lub brak rachunków w tym okresie.\n")
+        return
+
+    print(f"Całkowite koszty mieszkania: {format_currency(apartment_settlement.total_due_pln)}")
+
+    tenant_settlements = manager.create_tenants_settlements(apartment_settlement)
+    
+    if not tenant_settlements:
+        print("\n[!] Brak przypisanych lokatorów do tego mieszkania w danym okresie.\n")
+        return
+
+    print_subsection_header("Szczegółowy podział na lokatorów:")
+    for ts in tenant_settlements:
+        print(f"   • {ts.tenant:<20} do zapłaty: {format_currency(ts.total_due_pln)}")
+    print(f"\n{'=' * 70}")
+
+
+if __name__ == '__main__':
+    main()

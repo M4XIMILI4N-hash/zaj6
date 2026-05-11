@@ -71,4 +71,75 @@ class Manager:
             )
         for tenant in tenants_in_apartment ] 
     
+    def get_debtors_report(self) -> dict:
+
+            tenant_dues = {}  
+            tenant_paid = {} 
+            
+        
+            settlement_periods = set()
+            for bill in self.bills:
+                settlement_periods.add((bill.apartment, bill.settlement_year, bill.settlement_month))
+                
     
+            for apt_key, year, month in settlement_periods:
+                apt_settlement = self.get_settlement(apt_key, year, month)
+                if apt_settlement:
+                    tenants_settlements = self.create_tenants_settlements(apt_settlement)
+                    if tenants_settlements:
+                        for ts in tenants_settlements:
+                    
+                            tenant_dues[ts.tenant] = tenant_dues.get(ts.tenant, 0.0) + ts.total_due_pln
+                            
+    
+            for transfer in self.transfers:
+                
+                tenant_name = transfer.tenant 
+                tenant_paid[tenant_name] = tenant_paid.get(tenant_name, 0.0) + transfer.amount_pln
+                
+
+            debtors_report = {}
+            for tenant, due_amount in tenant_dues.items():
+                paid_amount = tenant_paid.get(tenant, 0.0)
+                debt = due_amount - paid_amount
+
+                if debt > 0.01:
+                    debtors_report[tenant] = round(debt, 2)
+                    
+            return debtors_report
+
+    
+    def get_tax(self, year: int, month: int, tax_rate: float) -> int:
+
+        total_income = 0.0
+        
+        for transfer in self.transfers:
+            
+            if transfer.settlement_year == year and transfer.settlement_month == month:
+                total_income += transfer.amount_pln
+                
+        tax_amount = round(total_income * tax_rate)
+        return tax_amount
+
+    def get_annual_report(self, year: int) -> dict:
+
+        total_incomes = 0.0
+        total_costs = 0.0
+        
+  
+        for transfer in self.transfers:
+       
+            if transfer.settlement_year == year:
+                total_incomes += transfer.amount_pln
+                
+      
+        for bill in self.bills:
+            if bill.settlement_year == year:
+                total_costs += bill.amount_pln
+                
+        return {
+            'year': year,
+            'incomes': round(total_incomes, 2),
+            'costs': round(total_costs, 2),
+            'profit': round(total_incomes - total_costs, 2)
+        }
